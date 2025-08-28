@@ -12,8 +12,7 @@ from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # LLMs
-from langchain_openai import ChatOpenAI  # set OPENAI_API_KEY in env
-# If you prefer, you can wire in other providers (e.g., Ollama) with LangChain community wrappers.
+from langchain_openai import ChatOpenAI  
 
 from prompts import BASE_SYSTEM, SHORT_SUMMARY, STRUCTURED_SUMMARY, ABSTRACT_FOCUS
 
@@ -31,11 +30,9 @@ def chunk_text(text: str, chunk_size=2000, chunk_overlap=200):
     return splitter.split_text(text)
 
 def count_tokens_rough(text: str) -> int:
-    # quick heuristic (works fine for metrics)
     return max(1, int(len(text) / 4))
 
 def summarize_chunks_llm(chunks, model_name: str, temperature: float, prompt_variant: str):
-    # Choose prompt
     if prompt_variant == "Short bullets":
         user_prompt = SHORT_SUMMARY
     elif prompt_variant == "Structured":
@@ -43,7 +40,6 @@ def summarize_chunks_llm(chunks, model_name: str, temperature: float, prompt_var
     else:
         user_prompt = ABSTRACT_FOCUS
 
-    # Init LLM
     llm = ChatOpenAI(model=model_name, temperature=temperature)
 
     # Summarize each chunk briefly
@@ -144,7 +140,7 @@ if run_button and uploaded_pdf:
                     save_artifacts(tmpdir, partial_summaries, final_summary)
                     mlflow.log_artifacts(tmpdir, artifact_path="summaries")
 
-                # (Optional) model signature-ish logging (inputs/outputs)
+
                 signature = infer_signature(
                     model_input={"text_len": len(text)},
                     model_output={"summary_len": len(final_summary)}
@@ -162,7 +158,7 @@ if run_button and uploaded_pdf:
                     st.markdown(f"**Chunk {i}**")
                     st.write(s)
 
-            st.info("Tip: run `mlflow ui` and open http://127.0.0.1:5000 to compare runs.")
+            # st.info("Tip: run `mlflow ui` and open http://127.0.0.1:5000 to compare runs.")
 
         except Exception as e:
             st.error(f"Error: {e}")
