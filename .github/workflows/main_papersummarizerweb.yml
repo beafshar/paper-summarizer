@@ -23,14 +23,14 @@ jobs:
       uses: docker/login-action@v2
       with:
         registry: https://ghcr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_b35df2d0c7ea4986a6c873d7ba5d94b6 }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_b2f324307ba94e25a913e5e5d7573836 }}
+        username: ${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}
+        password: ${{ secrets.AzureAppService_ContainerPassword_a3fdef3c8fc04bef8bf417d2fbe3a582 }}
 
     - name: Build and push container image to registry
       uses: docker/build-push-action@v3
       with:
         push: true
-        tags: ghcr.io/${{ secrets.AzureAppService_ContainerUsername_b35df2d0c7ea4986a6c873d7ba5d94b6 }}/beafshar/paper-summarizer:${{ github.sha }}
+        tags: ghcr.io/${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}/beafshar/paper-summarizer:${{ github.sha }}
         file: ./Dockerfile
 
   deploy:
@@ -47,5 +47,5 @@ jobs:
       with:
         app-name: 'papersummarizerweb'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_c6a24947fd094e7e9562271d8c317d6d }}
-        images: 'ghcr.io/${{ secrets.AzureAppService_ContainerUsername_b35df2d0c7ea4986a6c873d7ba5d94b6 }}/beafshar/paper-summarizer:${{ github.sha }}'
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_c2504764e1bb491e8f6a06be6a330326 }}
+        images: 'ghcr.io/${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}/beafshar/paper-summarizer:${{ github.sha }}'
