@@ -1,51 +1,70 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy container app to Azure Web App - papersummarizerweb
+name: Build, Push to GHCR, Deploy to Azure
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   workflow_dispatch:
 
+env:
+  APP_NAME: papersummarizerweb
+  RG: paper-summarizer-rg
+
 jobs:
-  build:
-    runs-on: 'ubuntu-latest'
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Log in to registry
-      uses: docker/login-action@v2
-      with:
-        registry: https://ghcr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_a3fdef3c8fc04bef8bf417d2fbe3a582 }}
-
-    - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
-      with:
-        push: true
-        tags: ghcr.io/${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}/beafshar/paper-summarizer:${{ github.sha }}
-        file: ./Dockerfile
-
-  deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-
+    permissions:
+      contents: read
+      packages: write   # required to push to GHCR
     steps:
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'papersummarizerweb'
-        slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_c2504764e1bb491e8f6a06be6a330326 }}
-        images: 'ghcr.io/${{ secrets.AzureAppService_ContainerUsername_7d7606d444174a7fa3be006ebc236d5c }}/beafshar/paper-summarizer:${{ github.sha }}'
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Compute lowercase image ref: ghcr.io/<owner>/<repo>
+      - name: Compute image ref
+        id: meta
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image (SHA + latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:latest
+
+      - name: Azure Login (service principal)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Ensure container port settings (idempotent)
+      - name: Ensure container port env vars
+        run: |
+          az webapp config appsettings set \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ env.RG }} \
+            --settings WEBSITES_PORT=8501 PORT=8501
+
+      # Point the Web App to the new immutable SHA tag and restart
+      - name: Update image and restart
+        run: |
+          az webapp config container set \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ env.RG }} \
+            --docker-custom-image-name ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
+          az webapp restart --name ${{ env.APP_NAME }} --resource-group ${{ env.RG }}
+
+      # Optional warm-up (won’t fail the job)
+      - name: Warm up
+        run: |
+          curl -I https://${{ env.APP_NAME }}.azurewebsites.net || true
